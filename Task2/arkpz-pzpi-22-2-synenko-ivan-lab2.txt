@@ -1,0 +1,865 @@
+﻿Харківський університет радіоелектроніки
+Факультет комп'ютерних наук
+Кафедра програмної інженерії
+
+
+
+
+
+
+ЗВІТ
+до лабораторної роботи 2 з дисципліни
+"Аналіз та рефакторинг коду"
+на тему: "РОЗРОБКА БАЗИ ДАНИХ ДЛЯ СЕРВЕРНОЇ ЧАСТИНИ ПРОГРАМНОЇ СИСТЕМИ ТА ПРИКЛАДНОГО ПРОГРАМНОГО ІНТЕРФЕЙСУ (API)"
+
+
+
+
+
+
+
+
+Виконав ст. гр ПЗПІ-22-2
+Синенко Іван Костянтинович
+
+
+Перевірив
+ст. викладач кафедри ПІ
+Сокорчук Ігор Петрович
+
+
+
+
+
+
+Харків 2024
+ 
+МЕТА
+        
+Метою роботи є розробити базу даних для серверної частини та прикладного програмного інтерфейсу для програмної системи реагування на загрози дронової атаки.
+
+
+ХІД РОБОТИ
+
+
+        Виконання лабораторної роботи я почав з побудови ER-діаграми. У процесі було використано нотацію Чена. ER-діаграма представлена у додатку А. Після цього було побудовано схему бази даних. Для зручності серіалізації та десеріалізації було обрано NoSQL-базу даних MongoDB. Схема бази даних наведена у додатку Б.
+        Потім були написані функції, що забезпечують підключення до MongoDB з коду на Java.
+Після цього була побудована UML-діаграма прецедентів серверної частини. Щоби запобігти надмірній складності, її було розділено на дві частини: дії з базою даних і дії системи, пов’язані зі сприйняттям інформації від радарів. Обидві діаграми наведені у додатку В. 
+        Далі було розроблено API для взаємодії серверної частини з клієнтами а також OpenAPI специфікацію для нього, яка наведена в Додатку Г. Специфікація надана у форматі YAML. 
+За специфікацією розроблене API було частково реалізовано: реалізовані операції CRUD і прийом даних від радарів. Авторизація і аутентифікація будуть реалізовані у наступних роботах. Приклади коду серверної частини наведено в Додатку Д. 
+1. Система має багаторівневу архітектуру елементи якої включають:
+–        Клієнтську частину, яка надсилає HTTP-запити до серверної складової;
+–        Серверну частину, яка обробляє ці запити та забезпечує взаємодію з базою даних;
+–        СУБД (MongoDB) для збереження структурованих даних.
+Взаємодія між рівнями реалізована через RESTful API, що дозволяє забезпечити інтеграцію з різними клієнтами (веб та мобільний додаток, IoT пристрої).
+2. Для розробки серверної частини використовувалась чиста мова Java. Це дозволяє вирішувати проблеми предметної області без необхідності додавати зайву складність через додаткове використання сущностей фреймворків, таких як Beans фреймворку Spring.
+3. Для створення HTTP-серверу використовувався легковажнний сервер Jetty. Його перевагою слугувало те, що його можна створити, запустити і сконфігурувати прямо з Java коду, що прибирає необхідність непрямої роботи з конфігураціями і дозволяє повністю контролювати процес його запуску з коду застосунку. 
+4. Для реалізації REST API був обраний фреймворк Eclipse Jersey. Обраний він був через простоту прописування шляхів, HTTP-методів і реакції на них. На відміну від Spring, він не вимагає від всієї програми підпорядковуватися якійсь певній схемі. 
+5. До аналізу даних застосовується патерн “Стратегія”: алгоритм аналізу даних винесений у інтерфейс ThreatAnalysisStrategy. Можна створювати нові його реалізації для більш ефективної оцінки загроз чи для різних параметрів того, що ми будемо вважати загрозою. Поточна реалізація - реалізація-макет MockStrategy - вважає загрожуючим лише об’єкт зі швидкістю більше 100 і відсутністю транспондера і слугує для демонстраційних цілей.
+6. До декодування даних з радарів також застосовується патерн “Стратегія”. Алгоритм декодування знаходиться у інтерфейсі RadarCodecStrategy. Зараз використовується FasterXMLCodecStrategy: декодування JSON-документів за допомогою методу бібліотеки FasterXML Jackson. У майбутньому, якщо це буде вважатися занадто повільним, можна буде змінити алгоритм кодування і декодування інформації з радарів. 
+7. Аналіз, показ і початок тривоги покладені на окремі відповідні потоки, які пов’язані між собою чергами LinkedBlockingQueue<>. Це рішення дозволяє обробляти дані по мірі їх приходу. Зберігання даних реального часу від радарів покладено на ще один окремий потік, який запускається раз на десять секунд і викликає збереження у БД, що дозволяє не завантажувати БД постійними запитами. Очищення БД від поточних даних радарів і збереження їх у binary dump покладено на ще один потік, який запускається один раз на 24 години.
+8. У випадку, якщо знайдені загрожуючі об’єкти, їх список передається потіку, що підіймає тривогу. Він змінює стан змінної тривоги у класі застосунку і викликає метод sendNotifications класу NotificationService.
+9. NotificationService реалізує у собі патерн “Спостерігач”. У ньому існує список об’єктів, які власне і реалізують відправку повідомлення про тривогу: на даному етапі це відправка по радіо (буде реалізовано у лабораторній роботі 4) і відправка мобільному клієнту. Такий підхід дозволяє у майбутньому розширити його функціонал, наприклад, додавши автоматичне вмикання сирени. 
+10. У якості СУБД на початковому етапі обрано MongoDB, оскільки вона дозволяє зберігати дані у вигляді серіалізованих об’єктів, що дозволить швидко і автоматично змінювати базу даних у відповідності до змін вимог, без необхідності змінювати старі дані.
+API був протестований за допомогою сервісу Postman. 
+Повний код наведений на Github. Фрагменти коду наведені у додатку Д. 
+Посилання на відео наведено у додатку Е. 
+ 
+ВИСНОВКИ
+
+
+Протягом лабораторної роботи було створено UML діаграму прецедентів та ER діаграму для програмної системи реагування на дронові атаки. На базі цих документів було створено базу даних та написано специфікацію OpenAPI для програмної системи.
+На базі специфікації було розроблену серверну частину програмної системи.
+Для розробки серверної частини використовувалася Java, пакет concurrent, сервер Jetty і бібліотека Eclipse Jersrey. У якості СУБД використовувався MongoDB, для взаємодії з нею використовувалися офіційні бібліотеки MongoDB. 
+
+
+
+ДОДАТОК А
+ER-діаграма
+  
+
+Рисунок 1 - ER-діаграма (нотація Чена)
+
+ДОДАТОК Б
+Схема бази даних
+
+
+  
+
+Рисунок 2 - Схема NoSQL бази даних MongoDB
+ДОДАТОК В
+UML-діаграми прецедентів серверної частини
+  
+
+Рисунок 3 - UML-діаграма прецедентів, дії з користувачами і авторизація
+  
+
+Рисунок 4 - UML-діаграма прецедентів (завершення)
+ДОДАТОК Г
+Специфікація OpenAPI
+openapi: 3.0.1
+info:
+  title: Threat Detection System API
+  version: '1.0'
+paths:
+  /employees:
+    get:
+      tags:
+        - Employees
+      summary: 'Get all employees'
+      operationId: 'getAllEmployees'
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: 'List of all employees retrieved successfully'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        '400':
+          description: 'Bad request due to invalid parameters'
+        '404':
+          description: 'Resource not found'
+        '500':
+          description: 'Internal server error'         
+    post:
+      tags:
+        - Employees
+      summary: 'Add a new employee'
+      operationId: 'addEmployee'
+      security:
+        - BearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: 'New employee successfully added'
+        '400':
+          description: 'Bad request due to invalid parameters'
+        '404':
+          description: 'Resource not found'
+        '500':
+          description: 'Internal server error' 
+  /employees/view:
+    get:
+      tags:
+        - Employees
+      summary: 'Get employee by phone number'
+      operationId: 'getEmployeeByPhoneNumber'
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: phonenumber
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Employee details retrieved successfully'
+          content:
+            application/json:
+              schema:
+                type: object
+              security:
+                - BearerAuth: []
+        '400':
+          description: 'Bad request due to invalid parameters'
+        '404':
+          description: 'Resource not found'
+        '500':
+          description: 'Internal server error'
+  /employees:
+    put:
+      tags:
+        - Employees
+      summary: 'Update an employee by phone number'
+      operationId: 'updateEmployee'
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: phonenumber
+          in: query
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+            security:
+              - BearerAuth: []
+      responses:
+        '200':
+          description: 'Employee data updated successfully'
+        '400':
+          description: 'Bad request due to invalid parameters'
+        '404':
+          description: 'Resource not found'
+        '500':
+          description: 'Internal server error'
+    delete:
+      tags:
+        - Employees
+      summary: 'Delete an employee by phone number'
+      operationId: 'deleteEmployee'
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: phonenumber
+          in: query
+          required: true
+          schema:
+            type: string
+          security:
+            - BearerAuth: []
+      responses:
+        '200':
+          description: 'Employee deleted successfully'
+        '400':
+          description: 'Bad request due to invalid parameters'
+        '404':
+          description: 'Resource not found'
+        '500':
+          description: 'Internal server error'
+  /devices:
+    get:
+      tags:
+        - Devices
+      summary: 'Get all devices'
+      operationId: 'getAllDevices'
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: 'List of all devices retrieved successfully'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                security:
+                  - BearerAuth: []
+        '404':
+          description: 'Resource not found'
+        '500':
+          description: 'Internal server error'
+    post:
+      tags:
+        - Devices
+      summary: 'Add a new device'
+      operationId: 'addDevice'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: 'New device successfully added'
+        '400':
+          description: 'Bad request due to invalid parameters'
+        '404':
+          description: 'Resource not found'
+        '500':
+          description: 'Internal server error'
+  /devices/view:
+    get:
+      tags:
+        - Devices
+      summary: 'Get device by name'
+      operationId: 'getDeviceByName'
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Device details retrieved successfully'
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          description: 'Bad request due to invalid parameters'
+        '404':
+          description: 'Resource not found'
+        '500':
+          description: 'Internal server error'
+  /devices:
+    put:
+      tags:
+        - Devices
+      summary: 'Update a device by name'
+      operationId: 'updateDevice'
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: query
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: 'Device data updated successfully'
+        '400':
+          description: 'Bad request due to invalid parameters'
+        '404':
+          description: 'Resource not found'
+        '500':
+          description: 'Internal server error'
+    delete:
+      tags:
+        - Devices
+      summary: 'Delete a device by name'
+      operationId: 'deleteDevice'
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Device deleted successfully'
+  /message-scenarios:
+    get:
+      tags:
+        - Message Scenarios
+      summary: 'Get all message scenarios'
+      operationId: 'getAllMessageScenarios'
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: 'List of all message scenarios retrieved successfully'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        '400':
+          description: 'Bad request due to invalid parameters'
+        '404':
+          description: 'Resource not found'
+        '500':
+          description: 'Internal server error'
+    post:
+      tags:
+        - Message Scenarios
+      summary: 'Add a new message scenario'
+      operationId: 'addMessageScenario'
+      security:
+        - BearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: 'New message scenario successfully added'
+        '400':
+          description: 'Bad request due to invalid parameters'
+        '404':
+          description: 'Resource not found'
+        '500':
+          description: 'Internal server error'
+  /message-scenarios/view:
+    get:
+      tags:
+        - Message Scenarios
+      summary: 'Get message scenario by name'
+      operationId: 'getMessageScenarioByName'
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: scenarioName
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Message scenario details retrieved successfully'
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          description: 'Bad request due to invalid parameters'
+        '404':
+          description: 'Resource not found'
+        '500':
+          description: 'Internal server error'
+  /message-scenarios:
+    put:
+      tags:
+        - Message Scenarios
+      summary: 'Update a message scenario by name'
+      operationId: 'updateMessageScenario'
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: scenarioName
+          in: query
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: 'Message scenario updated successfully'
+        '400':
+          description: 'Bad request due to invalid parameters'
+        '404':
+          description: 'Resource not found'
+        '500':
+          description: 'Internal server error'
+    delete:
+      tags:
+        - Message Scenarios
+      summary: 'Delete a message scenario by name'
+      operationId: 'deleteMessageScenario'
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: scenarioName
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Message scenario deleted successfully'
+        '400':
+          description: 'Bad request due to invalid parameters'
+        '404':
+          description: 'Resource not found'
+        '500':
+          description: 'Internal server error'
+  /radar/receive:
+    post:
+      tags:
+        - Radar
+      summary: 'Post radar data to the receiver'
+      operationId: 'postRadarData'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: 'Radar data successfully received'
+        '404':
+          description: 'Resource not found'
+        '500':
+          description: 'Internal server error'
+/radar/alarm/start:
+    post:
+      tags:
+        - Radar
+      summary: 'Start alarm by dispatcher'
+      description: 'Triggers an alarm based on radar data.'
+      operationId: 'startAlarm'
+      security:
+        - BearerAuth: []
+      requestBody:
+        description: 'Alarm parameters to start the alert'
+        required: true
+        responses:
+        '200':
+          description: 'Alarm started successfully'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: 'Alarm successfully started'
+        '401':
+          description: 'Unauthorized access'
+        '403':
+          description: 'Insufficient permissions to start the alarm'
+        '500':
+          description: 'Internal server error'
+  /auth/login:
+    post:
+      tags:
+        - Authorization
+      summary: 'Authenticate a user and issue a JWT token'
+      operationId: 'loginUser'
+      requestBody:
+        description: 'User credentials for authentication'
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                phoneNumber:
+                  type: string
+                  description: 'Your phone'
+                  example: '+380671111111'
+                password:
+                  type: string
+                  description: 'User password'
+                  example: 'securePassword123'
+              required:
+                - name
+                - phoneNumber
+                - password
+      responses:
+        '200':
+          description: 'User authenticated successfully and JWT token issued'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    description: 'JWT access token'
+                    example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
+        '400':
+          description: 'Invalid credentials provided'
+        '500':
+          description: 'Internal server error'
+  /radar/realtime:
+    get:
+      tags:
+        - Radar
+      summary: 'Real-time radar view via WebSocket'
+      description: 'Establish a WebSocket connection for dispatchers to view live radar data.'
+      operationId: 'radarRealtimeView'
+      security:
+        - BearerAuth: []
+      responses:
+        '101':
+          description: 'Switching Protocols - WebSocket connection established'
+        '401':
+          description: 'Unauthorized access'
+        '500':
+          description: 'Internal server error'
+  /auth/login:
+    post:
+      tags:
+        - Authorization
+      summary: 'Authenticate a user and issue a JWT token'
+      operationId: 'loginUser'
+      requestBody:
+        description: 'User credentials for authentication'
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                phoneNumber:
+                  type: string
+                  description: 'Your phone'
+                  example: '+380671111111'
+                password:
+                  type: string
+                  description: 'User password'
+                  example: 'securePassword123'
+              required:
+                - name
+                - phoneNumber
+                - password
+      responses:
+        '200':
+          description: 'User authenticated successfully and JWT token issued'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    description: 'JWT access token'
+                    example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
+        '400':
+          description: 'Invalid credentials provided'
+        '500':
+          description: 'Internal server error'
+
+
+  /auth/register:
+    post:
+      tags:
+        - Authorization
+      summary: 'Register a new user'
+      operationId: 'registerUser'
+      requestBody:
+        description: 'User details for account creation'
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: 'Your name and surname divided by whitespace'
+                  example: 'Taras Chernenko'
+                phoneNumber:
+                  type: string
+                  description: 'Your phone'
+                  example: '+380671111111'
+                password:
+                  type: string
+                  description: 'User password'
+                  example: 'securePassword123'
+                confirmPassword:
+                  type: string
+                  description: 'Confirm the desired password'
+                  example: 'securePassword123'
+              required:
+                - name 
+                - phoneNumber
+                - password
+                - confirmPassword
+      responses:
+        '201':
+          description: 'User registered successfully'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: 'User registration successful'
+        '400':
+          description: 'Invalid input or validation failed'
+        '409':
+          description: 'Phone number already exists'
+        '500':
+          description: 'Internal server error'
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+security:
+  - BearerAuth: []
+
+
+ДОДАТОК Д
+Приклади коду серверної частини
+Лістинг 1 - Код ініціалізації застосунку
+public class BastionApplication {
+    private static final AtomicBoolean isAlarm = new AtomicBoolean(false);
+    private static final int MAX_THREADS = 8;
+    JettyServer httpServer;
+    ExecutorService executorService;
+
+
+    RadarAnalyzerThread analyzer;
+    RadarViewerThread viewer;
+    AlarmThread alarmer;
+
+
+    SaveThread saver;
+    DailyCleanupThread dailyCleaner;
+
+
+    BlockingQueue<SkyState> viewsQueue;
+    BlockingQueue<SkyState> saveQueue;
+    BlockingQueue<AlarmEvent> alarmsQueue;
+
+
+    public BastionApplication() {
+
+
+        executorService = Executors.newScheduledThreadPool(MAX_THREADS);
+        viewsQueue = new LinkedBlockingQueue<>();
+        alarmsQueue = new LinkedBlockingQueue<>();
+        saveQueue = new LinkedBlockingQueue<>();
+        analyzer = new RadarAnalyzerThread(viewsQueue, saveQueue, alarmsQueue);
+        viewer = new RadarViewerThread(viewsQueue);
+        alarmer = new AlarmThread(alarmsQueue);
+
+
+        saver = new SaveThread(saveQueue);
+        dailyCleaner = new DailyCleanupThread();
+
+
+
+
+        httpServer = new JettyServer(executorService);
+
+
+    }
+
+
+    public void start() throws Exception {
+        executorService.execute(analyzer);
+        executorService.execute(viewer);
+        executorService.execute(alarmer);
+
+
+        saver.start();
+        dailyCleaner.start();
+
+
+        httpServer.start();
+
+
+    }
+
+
+    public static boolean isAlarm() {
+        return isAlarm.get();
+    }
+
+
+    public static boolean startAlarm() {
+        return isAlarm.compareAndSet(false, true);
+    }
+
+
+    public static void main(String[] args) {
+        try {
+            BastionApplication app = new BastionApplication();
+            Runtime.getRuntime().addShutdownHook(new BastionShutdownHook(app.httpServer, app.executorService));
+            app.start();
+
+
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+
+}
+
+
+Лістинг 2 - Код потоку аналізу загроз
+public class RadarAnalyzerThread extends Thread {
+    private final SkyStateQueue skyStatesQueue;
+    private final BlockingQueue<SkyState> viewsQueue;
+    private final BlockingQueue<SkyState> saveQueue;
+    private final BlockingQueue<AlarmEvent> alarmsQueue;
+    private final ThreatAnalysisStrategy strategy;
+
+
+    private SkyState currentSkyState;
+
+
+    public RadarAnalyzerThread(BlockingQueue<SkyState> viewsQueue,
+                               BlockingQueue<SkyState> saveQueue,
+                               BlockingQueue<AlarmEvent> alarmsQueue) {
+        this.skyStatesQueue = SkyStateQueue.getInstance();
+        this.viewsQueue = viewsQueue;
+        this.saveQueue = saveQueue;
+        this.alarmsQueue = alarmsQueue;
+
+
+        this.strategy = new MockStrategy();
+    }
+
+
+    @Override
+    public void run() {
+        System.out.println("RadarAnalyzerThread started");
+        try {
+            while (true) {
+                currentSkyState = skyStatesQueue.take();
+                System.out.println("RadarAnalyzerThread received skyState");
+                viewsQueue.put(currentSkyState);
+                saveQueue.put(currentSkyState);
+                //Analysis is delegated to strategy, so we can change it without changing this file.
+                List<SkyObject> threateningObjects = strategy.analyze(currentSkyState);
+                System.out.println("RadarAnalyzerThread analyzed skyState");
+
+
+                if (! threateningObjects.isEmpty()) {
+                    AlarmEvent alarmEvent = new AlarmEvent(threateningObjects);
+                    alarmsQueue.put(alarmEvent);
+                    BastionApplication.startAlarm();
+                }
+
+
+
+
+            }
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        }
+    }
+}
+
+
+Лістинг 3 - Код, що автоматично зберігає у базу даних інформацію з радарів
+public class SaveThread extends Thread {
+    private static final int MAX_BUFFER_SIZE = 3; //For test reasons
+    private final SkyStateDao skyStateDao;
+    private final BlockingQueue<SkyState> saveQueue;
+    private final ScheduledExecutorService scheduler;
+
+
+    public SaveThread(BlockingQueue<SkyState> saveQueue) {
+        this.skyStateDao = DatabaseService.getInstance().getSkyStateDao();
+        this.saveQueue = saveQueue;
+        this.scheduler = Executors.newSingleThreadScheduledExecutor();
+    }
+
+
+    public void start() {
+        System.out.println("Save Thread started");
+        scheduler.scheduleAtFixedRate(this, 0, 10, TimeUnit.SECONDS);
+    }
+
+
+    @Override
+    public void run() {
+        try {
+            if (saveQueue.size() > MAX_BUFFER_SIZE) {
+                List<SkyState> buffer = new ArrayList<>();
+                saveQueue.drainTo(buffer);
+                skyStateDao.saveAll(buffer);
+                System.out.println("Saved " + buffer.size() + " states to the database.");
+            } else {
+                System.out.println("Current buffer size is " + saveQueue.size() + ", thread goes back to sleep");
+            }
+        } catch (Exception e) {
+            System.err.println("Error during save operation: " + e.getMessage());
+        }
+    }
+}
+
+
+ДОДАТОК Е
+Посилання на відео 
+https://youtu.be/b3FRAnerHR0
