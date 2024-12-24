@@ -1,0 +1,436 @@
+﻿Харківський університет радіоелектроніки
+Факультет комп'ютерних наук
+Кафедра програмної інженерії
+
+
+
+
+
+
+ЗВІТ
+до лабораторної роботи 3 з дисципліни
+"Аналіз та рефакторинг коду"
+на тему: " РОЗРОБКА БІЗНЕС-ЛОГІКИ ТА ФУНКЦІЙ АДМІНІСТРУВАННЯ СЕРВЕРНОЇ ЧАСТИНИ ПРОГРАМНОЇ СИСТЕМИ"
+
+
+
+
+
+
+
+
+Виконав ст. гр ПЗПІ-22-2
+Синенко Іван Костянтинович
+
+
+Перевірив
+ст. викладач кафедри ПІ
+Сокорчук Ігор Петрович
+
+
+
+
+
+
+
+
+Харків 2024
+ 
+МЕТА
+        
+Мета роботи - розробити бізнес-логику та функції адміністрування серверної частини  програмної системи.
+
+
+ХІД РОБОТИ
+        
+        У ході виконання роботи було реалізовано наступні функції адміністрування та бізнес-логіки:
+1. Авторизація і аутентифікація. Для запобігання небажаному доступу до серверу треба забезпечити, щоби певні функції (наприклад, видалення інформації) були доступні лише адміністратору. Була реалізована функція авторизації за допомогою кодування Base64, а також внесені зміни у структуру веб-ресурсів, що позначили, які ресурси доступні кожному типу  користувачів. Ця політика була прописана анотаціями Jersey до класів веб-ресурсів і методів, що відповідають на запити. Неавторизований доступ перепиняється спеціальним класом-фільтром AuthenticationFilter, що блокує доступ, якщо кеш паролю відсутній або не співпадає з кешем для певного користувача.
+2. Безпечне і економне зберігання паролю з кешуванням: замість зберігання паролю база даних зберігає його хеш, закодований за допомогою блокового алгоритму “Блоуфіш” Брюса Шнайєра, що реалізований у бібліотеці jbcrypt. Також, якщо користувач входив у систему, кеш його паролю зберігається у кеші системи: в спеціальній таблиці всередині класу-фільтру AuthenticationFilter. Запит до бази даних проводиться лише якщо паролю немає у кеші. Це дозволяє економити час на запитах до БД, що інакше проводилися б при кожній авторизації (кожному доступу до ресурсу, що вимагає авторизації).
+3. Аналіз і зберігання даних у реальному часі. Поступаючі від радарів дані збираються ресурсом і передаються в чергу на аналіз. Всі дані перевіряються на ID радару, і записуються лише у тому випадку, якщо їм відповідає один з активних у цей час радарів. Стан неба передається в чергу на аналіз у тому випадку, якщо всі радари відправили свою інформацію. Існує також спеціальний потік, який періодично активується і відправляє стани неба на аналіз навіть у випадку, якщо всі радари не відповіли. Це існує для запобігання нескінченному очікуванню.
+ 4. До аналізу даних застосовується патерн “Стратегія”: алгоритм аналізу даних винесений у інтерфейс ThreatAnalysisStrategy. Можна створювати нові його реалізації для більш ефективної оцінки загроз чи для різних параметрів того, що ми будемо вважати загрозою. Поточна реалізація - реалізація-макет MockStrategy - вважає загрожуючим лише об’єкт зі швидкістю більше 100 і відсутністю транспондера і слугує для демонстраційних цілей.
+5. До декодування даних з радарів також застосовується патерн “Стратегія”. Алгоритм декодування знаходиться у інтерфейсі RadarCodecStrategy. Зараз використовується FasterXMLCodecStrategy: декодування JSON-документів за допомогою методу бібліотеки FasterXML Jackson. У майбутньому, якщо це буде вважатися занадто повільним, можна буде змінити алгоритм кодування і декодування інформації з радарів. 
+6. Аналіз, показ і початок тривоги покладені на окремі відповідні потоки, які пов’язані між собою чергами LinkedBlockingQueue<>. Це рішення дозволяє обробляти дані по мірі їх приходу. Зберігання даних реального часу від радарів покладено на ще один окремий потік, який запускається раз на десять секунд і викликає збереження у БД, що дозволяє не завантажувати БД постійними запитами. Очищення БД від поточних даних радарів і збереження їх у binary dump покладено на ще один потік, який запускається один раз на 24 години.
+7. У випадку, якщо знайдені загрожуючі об’єкти, їх список передається потіку, що підіймає тривогу. Він змінює стан змінної тривоги у класі застосунку і викликає метод класу NotificationService.
+8. NotificationService реалізує у собі патерн “Спостерігач”. У ньому існує список об’єктів, які власне і реалізують відправку повідомлення про тривогу: на даному етапі це відправка по радіо (буде реалізовано у лабораторній роботі 4) і відправка мобільному клієнту. Такий підхід дозволяє у майбутньому розширити його функціонал, наприклад, додавши автоматичне вмикання сирени. 
+9. Автоматичне збереження резервних копій бази даних: спеціальний потік, що активується при запуску системи, а потім 1 раз на добу, займається викликом утіліти mongodump. 
+10. Реєстрація з викликом зовнішнього API Twilio для надсилання коду на SMS.
+ 
+ВИСНОВКИ
+
+
+Протягом лабораторної роботи була реалізована бізнес-логіка серверної частини проекту.
+________________
+
+
+
+
+ДОДАТОК А
+UML-діаграма послідовності
+  
+
+Рисунок 3 - UML-діаграма послідовності
+________________
+ДОДАТОК Б
+UML-діаграми взаємодії
+
+
+                  
+Рисунок 3 - Діаграма взаємодії: реєстрація за допомогою СМС
+
+
+
+
+  
+
+
+
+Рисунок 4 - Діаграма взаємодії: надходження інформації з радару
+________________
+ДОДАТОК В
+Фрагменти коду серверу
+
+
+Лістинг 1 - Потік автоматичного збереження бекапів бази даних
+public class DailyCleanupThread implements Runnable {
+    private static final String OUTPUT_FILE_PATH = "C:\\Users\\HP\\OneDrive\\Desktop\\MongoDB";
+
+
+    @Override
+    public void run() {
+        try {
+            System.out.println("Performing daily cleanup...");
+            DatabaseService.getInstance().dumpSkyStates(OUTPUT_FILE_PATH);
+            System.out.println("Sky states dumped successfully.");
+        } catch (Exception e) {
+            System.err.println("Error during daily cleanup: " + e.getMessage());
+        }
+    }
+}
+
+
+
+
+Лістинг 2 - Функція виклику автоматичного збереження
+public void dumpSkyStates(String outputPath) {
+        List<String> command = Arrays.asList(
+                "C:\\Program Files\\MongoDB\\Tools\\100\\bin\\mongodump.exe",
+                "--db", "bastion",
+                "--collection", "sky_state",
+                "--out", outputPath
+        );
+        ProcessBuilder pb = new ProcessBuilder(command).directory(new File(outputPath));
+        System.out.println(pb.command());
+        int exitCode = 0;
+        try {
+            Process process = pb.start();
+            exitCode = process.waitFor();
+        } catch (InterruptedException | IOException e) {
+            throw new RuntimeException(e);
+        }
+
+
+        System.out.println("exitCode:" + exitCode);
+    }
+
+
+    public void dumpDatabase(String outputPath) {
+        List<String> command = Arrays.asList(
+                "C:\\Program Files\\MongoDB\\Tools\\100\\bin\\mongodump.exe",
+                "--db", "bastion",
+                "--out", outputPath
+        );
+        ProcessBuilder pb = new ProcessBuilder(command).directory(new File(outputPath));
+        System.out.println(pb.command());
+        int exitCode = 0;
+        try {
+            Process process = pb.start();
+            exitCode = process.waitFor();
+        } catch (InterruptedException | IOException e) {
+            throw new RuntimeException(e);
+        }
+
+
+        System.out.println("exitCode:" + exitCode);
+    }
+
+
+
+
+Лістинг 3 - Ресурс, що приймає дані з радарів
+}
+
+
+
+
+Лістинг 4 - Фільтр авторизації
+package com.web.resources;
+
+
+import com.model.Employee;
+import com.service.database.DatabaseService;
+import com.service.database.dao.EmployeeDao;
+import com.service.database.utils.HashUtil;
+import jakarta.annotation.Priority;
+import jakarta.ws.rs.container.ContainerRequestContext;
+import jakarta.ws.rs.container.ContainerRequestFilter;
+import jakarta.ws.rs.core.SecurityContext;
+import jakarta.ws.rs.ext.Provider;
+
+
+import java.security.Principal;
+import java.util.Base64;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+
+
+import static jakarta.ws.rs.Priorities.AUTHENTICATION;
+
+
+
+
+
+
+/***************************************
+ Filter that restricts  access to every
+ resource by setting a SecurityContext.
+
+
+ For example. If user is administrator,
+ and successfully logs in, he's given
+ "administrator" role and
+ can access all administrator resources.
+
+
+ Roles are specified in User.getApplicationRole().
+ Permissions to access a resource are specified
+ in annotations of resource methods.
+
+
+ **************************************/
+
+
+
+
+@Provider
+@Priority(AUTHENTICATION)
+public class AuthenticationFilter implements ContainerRequestFilter {
+    private static final ConcurrentMap<String, Employee> logins = new ConcurrentHashMap<>();
+    private static final EmployeeDao employeeDao = DatabaseService.getInstance().getEmployeeDao();
+
+
+    @Override
+    public void filter(ContainerRequestContext requestContext) {
+        //Unrecognised radars are blocked in RadarReceiver.
+        String path = requestContext.getUriInfo().getPath();
+        if (path.startsWith("radar/receive") || path.startsWith("register")) {
+            return;
+        }
+
+
+        String authHeader = requestContext.getHeaderString("Authorization");
+        if (authHeader == null || !authHeader.startsWith("Basic ")) {
+            abortRequest(requestContext, "Missing or invalid Authorization header");
+            return;
+        }
+
+
+        // Decode and validate credentials
+        String encodedCredentials = authHeader.substring("Basic ".length());
+        String decodedCredentials = new String(Base64.getDecoder().decode(encodedCredentials));
+        String[] parts = decodedCredentials.split(":");
+        String phoneNumber = parts[0];
+        String password = parts[1];
+        Employee employee;
+
+
+        //Get employee from database or from cash if they logged in.
+        if (!logins.containsKey(phoneNumber)) {
+            employee = employeeDao.get(phoneNumber);
+        } else {
+            employee = logins.get(phoneNumber);
+        }
+
+
+        if (parts.length != 2 || !validateUser(employee, password)) {
+            abortRequest(requestContext, "Invalid username or password");
+            return;
+        }
+
+
+        String role = employee.getApplicationRole();
+        logins.put(phoneNumber, employee);
+
+
+        // Set SecurityContext that represents rights of user.
+        requestContext.setSecurityContext(new CustomSecurityContext(phoneNumber, role));
+    }
+
+
+    private boolean validateUser(Employee employee, String password) {
+        if (employee != null) {
+            if (HashUtil.checkPassword(password, employee.getPasswordHash())){
+                return true;
+            }
+        }
+        return false;
+    }
+
+
+
+
+
+
+
+
+    private void abortRequest(ContainerRequestContext requestContext, String message) {
+        requestContext.abortWith(jakarta.ws.rs.core.Response
+                .status(jakarta.ws.rs.core.Response.Status.UNAUTHORIZED)
+                .entity(message)
+                .build());
+    }
+
+
+    private static class CustomSecurityContext implements SecurityContext {
+        private final String username;
+        private final String role;
+
+
+        public CustomSecurityContext(String username, String role) {
+            this.username = username;
+            this.role = role;
+        }
+
+
+        @Override
+        public Principal getUserPrincipal() {
+            return () -> username;
+        }
+
+
+        @Override
+        public boolean isUserInRole(String role) {
+            return this.role.equals(role);
+        }
+
+
+        @Override
+        public boolean isSecure() {
+            return false;
+        }
+
+
+        @Override
+        public String getAuthenticationScheme() {
+            return "BASIC";
+        }
+    }
+}
+
+
+
+
+
+
+Лістинг 5 - Реєстрація з веріфікацією по СМС
+package com.web.resources;
+
+
+import com.model.Employee;
+import com.model.enums.Role;
+import com.service.database.DatabaseService;
+import com.service.database.dao.EmployeeDao;
+import com.service.sms.SMSService;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Random;
+
+
+/***************************************
+
+
+ Resource used to register new users.
+ Requires sending SMS.
+
+
+ **************************************/
+
+
+@Path("/register")
+public class RegistrationResource {
+    EmployeeDao employeeDao = DatabaseService.getInstance().getEmployeeDao();
+    SMSService smsService = new SMSService();
+    private static final Map<String, String> verificationCodes = new HashMap<>();
+    private static final Map<String, Employee> unregisteredEmployees = new HashMap<>();
+
+
+    @POST
+    @Consumes(MediaType.APPLICATION_JSON)
+    public Response registerEmployee(Employee employee) {
+        //The only way to register should be to register as a USER.
+        //Employees should be promoted only by administrator.
+        if (!employee.getRole().equals(Role.USER)) {
+            employee.setRole(Role.USER);
+        }
+        // Generate a random verification code
+        String verificationCode = generateVerificationCode();
+        verificationCodes.put(employee.getPhoneNumber(), verificationCode);
+        unregisteredEmployees.put(employee.getPhoneNumber(), employee);
+
+
+        // Send the code via SMS
+        try {
+            smsService.sendSMS(employee.getPhoneNumber(), "Ваш код веріфікації: " + verificationCode);
+        } catch (Exception e) {
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity("Failed to send verification code: " + e.getMessage())
+                    .build();
+        }
+
+
+        return Response.ok("Verification code sent to " + employee.getPhoneNumber()).build();
+    }
+
+
+    @POST
+    @Path("/verify")
+    @Consumes(MediaType.APPLICATION_JSON)
+    public Response verifyEmployee(Map<String, String> requestBody) {
+        String phoneNumber = requestBody.get("phoneNumber");
+        String code = requestBody.get("code");
+
+
+        // Check if the code matches
+        if (verificationCodes.containsKey(phoneNumber) && verificationCodes.get(phoneNumber).equals(code)) {
+            verificationCodes.remove(phoneNumber); // Remove code after verification
+
+
+            employeeDao.save(unregisteredEmployees.get(phoneNumber));
+            return Response.ok("Registration complete").build();
+        } else {
+            return Response.status(Response.Status.UNAUTHORIZED)
+                .entity("Invalid verification code")
+                .build();
+        }
+    }
+
+
+    private String generateVerificationCode() {
+        Random random = new Random();
+        return String.format("%06d", random.nextInt(1000000)); // Generate a 6-digit code
+    }
+}
+
+
+________________
+
+
+ДОДАТОК Г
+Посилання на відео 
+https://youtu.be/hxGK-V9n3L8
