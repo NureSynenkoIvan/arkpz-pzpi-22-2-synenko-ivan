@@ -1,0 +1,249 @@
+﻿Харківський університет радіоелектроніки
+Факультет комп'ютерних наук
+Кафедра програмної інженерії
+
+
+
+
+
+
+ЗВІТ
+до лабораторної роботи 4 з дисципліни
+"Аналіз та рефакторинг коду"
+на тему: "РОЗРОБКА IoT КЛІЄНТА 
+(БІЗНЕС-ЛОГІКИ ТА ФУНКЦІЙ НАЛАШТУВАННЯ)"
+
+
+
+
+
+
+
+
+Виконав ст. гр ПЗПІ-22-2
+Синенко Іван Костянтинович
+
+
+Перевірив
+ст. викладач кафедри ПІ
+Сокорчук Ігор Петрович
+
+
+
+
+
+
+
+
+Харків 2024
+ 
+МЕТА
+        
+Метою роботи є є розробити програмне забезпечення для  IoT або SmartDevice пристрою, створеного на базі будь-якої поширеної на  сьогодні платформи, придатної для реалізації вбудованих систем (Embedded System), для програмної системи реагування на загрози дронової атаки.
+
+
+ХІД РОБОТИ
+        Темою проекту передбачено два типи IoT-девайсів: плати для забезпечення зв’язку з радарами та плата для активації радіопередача.
+        Спочатку було розроблено діаграми у форматі UML для цих пристроїв. Діаграми наведені у додатку А.
+Далі були обрані технології для втілення девайсів. Оскільки обробка даних з радарів може бути непростою, для цього типу пристроїв були обрані плати Raspberry Pi 4 с 1 ГБ RAM. Оскільки ці комп’ютери є програмованими, для написання коду на них була обрана мова Java 17 Core, для запобігання необхідності в використанні бібліотек.
+Для реалізації радіопередавання була також обрана плата Raspberry Pi, оскільки для цієї плати існує бібліотека PiFM, що дозволяє запускати файли формату .wav у трансляцію в ефірі. Для приймання інформації з серверу була обрана бібліотека flask, що є у Python, вбудованому в програмне забезпечення плати.
+Для реалізації була обрана програма Oracle VM Virtualbox, на якій була симульована робота плат Raspberry Pi.  
+Оскільки невідомо, у якому форматі буде виконуватися приймання інформації з радарів, це отримання симулюється одним з двох потоків програми плати, що грає роль мосту між радаром і сервером. Він створює об’єкти у сферичних координатах.
+Програма-мост переводить дані об’єктів зі сферичних координат у декартові, перетворюючи об’єкт радару у об’єкт типу SkyObject - такий самий, який використовується сервером. Далі він кодується: стратегія кодування може бути змінена, проте по дефолту для кодування об’єкту і відсилання його на сервер використовуються кодування у JSON і відсилання POST-запитом. 
+ У свою чергу програма радіостанції має власний легковажний веб-сервер, який очікує на POST-запит, у якому має бути передана назва файлу. Якщо такий запит приходить, програма має викликати кастомний shell-скрипт запуску радіопередача.  
+ 
+ВИСНОВКИ
+Протягом лабораторної роботи було створено UML діаграму прецедентів для IoT-частини проекту. Ця частина була розроблена, протестована і реалізована. 
+
+
+
+ДОДАТОК А
+UML-діаграми
+  
+Рисунок 1 - UML-діаграма прецедентів IoT (плата зв’язку з сервером)
+  
+Рисунок 2 - UML-діаграма прецедентів IoT (плата радіо)
+
+
+ДОДАТОК Б
+Програма для запуску радіостанції (по запиту)
+from flask import Flask, request, jsonify
+import subprocess
+
+
+app = Flask(__name__)
+
+
+@app.route('/radio', methods=['POST'])
+def play_radio():
+    # Extract file path or parameters from the POST request
+    data = request.get_json()
+    audio_file = data.get("audio_file")  # Expected JSON key: {"audio_file": "path_to_audio.wav"}
+
+
+    if not audio_file:
+        return jsonify({"error": "Missing 'audio_file' parameter"}), 400
+
+
+    try:
+        # Run the pifm-basic command in the terminal
+        result = subprocess.run(
+            ["sh", "pifm-arg.sh", "/home/ivan/PiFM/sounds" + audio_file],
+            cwd="/home/ivan/PiFM/src/pi4",
+            capture_output=True,
+            text=True
+        )
+        return jsonify({"message": "Audio started successfully!"}), 200
+        print("Radio started successfully")
+
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+
+
+if __name__ == '__main__':
+    # Run Flask app on port 5000
+    app.run(host='0.0.0.0', port=5000)
+
+
+
+ДОДАТОК В
+Код програмного забезпечення плат Raspberry Pi (фрагменти)
+Лістинг 1 - Код файлу стратегії передачі на сервер 
+package org.example.codec;
+
+
+import org.example.model.server.SkyObject;
+
+
+import java.io.IOException;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.List;
+
+
+import static java.lang.Thread.sleep;
+
+
+public interface ServerDataTransmissionStrategy {
+
+
+    //The server prototype accepted data as a JSON, that's why it's by
+    //default in a JSON format. New class may overwrite this.
+    int MAX_RETRIES = 3;  // Maximum number of retries
+    long RETRY_DELAY_MS = 5000; // Delay between retries in milliseconds
+
+
+    // Encodes a list of SkyObjects into JSON format
+    default Object encode(List<SkyObject> data) {
+        StringBuilder result = new StringBuilder("[");
+        data.forEach(obj -> result.append(obj.toJson()).append(","));
+        result.deleteCharAt(result.length() - 1);
+        return result.append("]").toString();
+    }
+
+
+    // Sends data to the server with retry logic
+    default void sendToServer(Object data, String serverUrl) {
+        int attempts = 0;
+
+
+        while (attempts < MAX_RETRIES) {
+            try {
+                attempts++;
+                System.out.println("Attempt " + attempts + " to send data to server.");
+
+
+                // Open connection to server
+                URL url = new URL(serverUrl);
+                HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+                connection.setDoOutput(true);
+                connection.setRequestMethod("POST");
+                connection.setRequestProperty("Content-Type", "application/json");
+
+
+                // Send data
+                try (OutputStream os = connection.getOutputStream()) {
+                    os.write(((String) data).getBytes());
+                    os.flush();
+                }
+
+
+                // Check response code
+                int responseCode = connection.getResponseCode();
+                System.out.println("Server response: " + responseCode);
+
+
+                if (responseCode >= 200 && responseCode < 300) {
+                    // Successful request; exit retry loop
+                    break;
+                } else {
+                    System.err.println("Unexpected server response: " + responseCode);
+                }
+            } catch (IOException e) {
+                System.err.println("Failed to send data: " + e.getMessage());
+            }
+
+
+            // Wait before retrying
+            if (attempts < MAX_RETRIES) {
+                try {
+                    System.out.println("Retrying in " + RETRY_DELAY_MS / 1000 + " seconds...");
+                    Thread.sleep(RETRY_DELAY_MS);
+                } catch (InterruptedException e) {
+                    System.err.println("Retry delay interrupted: " + e.getMessage());
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
+        }
+
+
+        if (attempts == MAX_RETRIES) {
+            System.err.println("All attempts to send data to server failed. Abandoning request.");
+        }
+    }
+}
+
+
+
+
+Лістинг 2 - Код запуску програми 
+package org.example;
+
+
+import org.example.model.RadarInformation;
+import org.example.thread.RadarBridge;
+import org.example.thread.RadarSimulationThread;
+
+
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+
+
+//This is a program that simulates behaviour of a program
+//that takes input radar data and transmits it to the server.
+public class Main {
+    private static final String URL = "http://192.168.1.93:8080/radar/receive";
+
+
+    public static void main(String[] args) {
+        BlockingQueue<RadarInformation> objects = new LinkedBlockingQueue<RadarInformation>();
+
+
+        RadarSimulationThread simulation = new RadarSimulationThread(objects);
+        RadarBridge bridge = new RadarBridge(simulation, objects, URL);
+
+
+        simulation.start();
+        bridge.start();
+    }
+}
+
+
+ДОДАТОК Г
+Посилання на відео 
+https://youtu.be/NDOxV9NEmgs
