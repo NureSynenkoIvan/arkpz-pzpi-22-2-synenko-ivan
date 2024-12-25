@@ -14,4 +14,6 @@ public interface SkyStateDao {
     public List<SkyState> getAll(SortingOrder order);
 
     public void delete(SkyState skyState);
+
+    public void deleteAll();
 }

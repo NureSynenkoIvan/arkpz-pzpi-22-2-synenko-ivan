@@ -16,7 +16,6 @@ import jakarta.ws.rs.core.Response;
 public class DatabaseDumpResource {
     private static final String OUTPUT_FILE_PATH = "C:\\Users\\HP\\OneDrive\\Desktop\\MongoDB";
     private static final DatabaseService databaseService = DatabaseService.getInstance();
-    String outputPath = "";
 
     @POST
     @Path("/sky-states")

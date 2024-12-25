@@ -11,8 +11,7 @@ public class LocationConfig extends Config {
     private Coordinates coordinates;
 
     public LocationConfig() {
-        //Sample coordinates
-        coordinates = new Coordinates(2, 2);
+        coordinates = new Coordinates(2, 2); //Sample coordinates
     }
 
     public static LocationConfig getInstance() {

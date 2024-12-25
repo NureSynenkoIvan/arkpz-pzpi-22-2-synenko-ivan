@@ -17,8 +17,7 @@ public class FasterXMLCodecStrategy implements RadarCodecStrategy {
             SkyObject[] objects = mapper.readValue(json, SkyObject[].class);
 
 
-            /*
-            FOR LATER RELEASE: SHIFT TO COORDINATE SYSTEM
+
             Coordinates zeroPoint = locationConfig.getCoordinates();
 
             for (SkyObject object : objects) {
@@ -26,8 +25,7 @@ public class FasterXMLCodecStrategy implements RadarCodecStrategy {
 
             }
 
-                        return objects;
-            */
+
             return objects;
         } catch (JsonProcessingException e) {
             throw new IllegalArgumentException(e);

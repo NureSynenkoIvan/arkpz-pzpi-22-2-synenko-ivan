@@ -16,15 +16,15 @@ public class RadioNotifier implements Notifier {
 
     @Override
     public void sendAlarmNotification(AlarmEvent event) {
-        sendFileToServer(config.startAlarmFile);
+        sendFileToServer(config.startAlarmFile, config.frequency);
     }
 
     @Override
     public void sendStopAlarmNotification() {
-        sendFileToServer(config.stopAlarmFile);
+        sendFileToServer(config.stopAlarmFile, config.frequency);
     }
 
-    private void sendFileToServer(String filename) {
+    private void sendFileToServer(String filename, float frequency) {
         try {
             URL url = new URL(config.URL);
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
@@ -33,7 +33,7 @@ public class RadioNotifier implements Notifier {
             connection.setRequestProperty("Content-Type", "application/json");
 
             // Build the JSON payload
-            String payload = String.format("{\"audio_file\": \"%s\"}", filename);
+            String payload = String.format("{\"audio_file\": \"%s\", \"frequency\" : \"%f\"}", filename, frequency);
 
             // Write payload to request body
             try (OutputStream os = connection.getOutputStream()) {

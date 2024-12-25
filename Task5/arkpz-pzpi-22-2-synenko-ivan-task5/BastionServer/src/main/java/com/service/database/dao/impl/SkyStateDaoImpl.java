@@ -11,6 +11,7 @@ import com.service.database.dao.AbstractDao;
 import com.service.database.dao.SkyStateDao;
 import com.model.SkyState;
 import com.model.enums.SortingOrder;
+import org.bson.Document;
 import org.bson.conversions.Bson;
 import com.service.database.utils.MongoUtil;
 
@@ -72,5 +73,11 @@ public class SkyStateDaoImpl extends AbstractDao implements SkyStateDao {
         MongoCollection<SkyState> skyStateCollection = getCollection();
         skyStateCollection.deleteOne(
                 Filters.eq("time", skyState.time));
+    }
+
+    @Override
+    public void deleteAll() {
+        MongoCollection<SkyState> skyStateCollection = getCollection();
+        skyStateCollection.deleteMany(new Document());
     }
 }

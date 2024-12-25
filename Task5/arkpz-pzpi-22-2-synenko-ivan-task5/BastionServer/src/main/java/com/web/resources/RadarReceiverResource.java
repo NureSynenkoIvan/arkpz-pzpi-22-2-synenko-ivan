@@ -6,7 +6,7 @@ import com.model.Device;
 import com.model.SkyObject;
 import com.model.SkyState;
 import com.model.enums.DeviceType;
-import com.web.SkyStateQueue;
+import com.web.singleton.SkyStateQueueSingleton;
 import com.web.codec.FasterXMLCodecStrategy;
 import com.web.codec.RadarCodecStrategy;
 import jakarta.inject.Singleton;
@@ -43,7 +43,7 @@ public class RadarReceiverResource {
             .filter(device -> device.getType().equals(DeviceType.RADAR))
             .toList();
     private static volatile AtomicInteger radarsLeft = new AtomicInteger(activeRadars.size());;
-    private static final SkyStateQueue skyStateQueue = SkyStateQueue.getInstance();
+    private static final SkyStateQueueSingleton SKY_STATE_QUEUE_SINGLETON = SkyStateQueueSingleton.getInstance();
     private static Map<Integer, List<SkyObject>> currentRadarData = new ConcurrentHashMap<>();
     private static volatile AtomicBoolean listeningStarted =  new AtomicBoolean(false);
 
@@ -99,7 +99,7 @@ public class RadarReceiverResource {
             SkyState currentSkyState = new SkyState(new Date(), false, collectedData);
 
             try {
-                skyStateQueue.put(currentSkyState);
+                SKY_STATE_QUEUE_SINGLETON.put(currentSkyState);
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }

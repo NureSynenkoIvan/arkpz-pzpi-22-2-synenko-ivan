@@ -6,6 +6,7 @@ public class RadioConfig extends Config {
 
     public final String startAlarmFile = "start.wav";
     public final String stopAlarmFile = "stop.wav";
+    public final float frequency = 94;
 
     public final String URL = "http://192.168.1.74:5000/radio";
 

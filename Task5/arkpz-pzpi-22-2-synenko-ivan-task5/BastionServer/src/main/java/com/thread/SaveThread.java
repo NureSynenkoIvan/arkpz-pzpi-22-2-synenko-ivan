@@ -3,13 +3,17 @@ package com.thread;
 import com.model.SkyState;
 import com.service.database.DatabaseService;
 import com.service.database.dao.SkyStateDao;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 
 public class SaveThread extends Thread {
+    private static final Logger logger = LoggerFactory.getLogger(SaveThread.class);
     private static final int MAX_BUFFER_SIZE = 3; //For test reasons, can be any reasonable number
+
     private final SkyStateDao skyStateDao;
     private final BlockingQueue<SkyState> saveQueue;
 
@@ -23,18 +27,18 @@ public class SaveThread extends Thread {
 
     @Override
     public void run() {
-        //It better be called periodically to avoid wasting system resoutces.
+        //It better be called periodically to avoid wasting system resources.
         try {
             if (saveQueue.size() > MAX_BUFFER_SIZE) {
                 List<SkyState> buffer = new ArrayList<>();
                 saveQueue.drainTo(buffer);
                 skyStateDao.saveAll(buffer);
-                System.out.println("Saved " + buffer.size() + " states to the database.");
+                logger.info("Saved {} states to the database.", buffer.size());
             } else {
-                System.out.println("Current buffer size is " + saveQueue.size() + ", thread goes back to sleep");
+                logger.debug("Current buffer size is {}, thread goes back to sleep", saveQueue.size());
             }
         } catch (Exception e) {
-            System.err.println("Error during save operation: " + e.getMessage());
+            logger.error("Error during save operation", e);
         }
     }
 
@@ -43,7 +47,7 @@ public class SaveThread extends Thread {
             List<SkyState> buffer = new ArrayList<>();
             saveQueue.drainTo(buffer);
             skyStateDao.saveAll(buffer);
-            System.out.println("Saved " + buffer.size() + " states to the database.");
+            logger.info("Forcefully saved {} states to the database while buffer was not full.", buffer.size());
         }
     }
 }

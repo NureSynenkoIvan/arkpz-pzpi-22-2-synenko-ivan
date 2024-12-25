@@ -20,18 +20,16 @@ import java.util.List;
 
 @Path("/message-scenarios")
 public class MessageScenarioResource {
-    private final MessageScenarioDao messageScenarioDao;
-
-    public MessageScenarioResource() {
-        DatabaseService databaseService = DatabaseService.getInstance();
-        this.messageScenarioDao = databaseService.getMessageScenarioDao();
-    }
+    private final MessageScenarioDao messageScenarioDao
+            = DatabaseService
+            .getInstance()
+            .getMessageScenarioDao();
 
     @GET
     @Path("/view")
     @RolesAllowed({"dispatcher", "administrator"})
     @Produces(MediaType.APPLICATION_JSON)
-    public MessageScenario getEmployee(@QueryParam("scenarioName") String scenarioName) {
+    public MessageScenario getMessageScenario(@QueryParam("scenarioName") String scenarioName) {
         return messageScenarioDao.get(scenarioName);
     }
 

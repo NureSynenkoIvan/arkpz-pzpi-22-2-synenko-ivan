@@ -5,13 +5,17 @@ import com.model.SkyObject;
 import com.model.SkyState;
 import com.strategy.MockStrategy;
 import com.strategy.ThreatAnalysisStrategy;
-import com.web.SkyStateQueue;
+import com.web.singleton.SkyStateQueueSingleton;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 
 public class RadarAnalyzerThread extends Thread {
-    private final SkyStateQueue skyStatesQueue;
+    Logger logger = LoggerFactory.getLogger(RadarAnalyzerThread.class);
+
+    private final SkyStateQueueSingleton skyStatesQueue;
     private final BlockingQueue<SkyState> viewsQueue;
     private final BlockingQueue<SkyState> saveQueue;
     private final BlockingQueue<AlarmEvent> alarmsQueue;
@@ -22,7 +26,7 @@ public class RadarAnalyzerThread extends Thread {
     public RadarAnalyzerThread(BlockingQueue<SkyState> viewsQueue,
                                BlockingQueue<SkyState> saveQueue,
                                BlockingQueue<AlarmEvent> alarmsQueue) {
-        this.skyStatesQueue = SkyStateQueue.getInstance();
+        this.skyStatesQueue = SkyStateQueueSingleton.getInstance();
         this.viewsQueue = viewsQueue;
         this.saveQueue = saveQueue;
         this.alarmsQueue = alarmsQueue;
@@ -32,11 +36,11 @@ public class RadarAnalyzerThread extends Thread {
 
     @Override
     public void run() {
-        System.out.println("RadarAnalyzerThread started");
+        logger.info("RadarAnalyzerThread started");
         try {
             while (true) {
                 currentSkyState = skyStatesQueue.take();
-                System.out.println("RadarAnalyzerThread received skyState");
+                logger.info("RadarAnalyzerThread received skyState");
 
                 //Saving data to DB and viewing is delegated to different threads.
                 viewsQueue.put(currentSkyState);
@@ -45,7 +49,7 @@ public class RadarAnalyzerThread extends Thread {
                 //Analysis is delegated to strategy, so we can change it without changing this file.
                 //Get list of threatening objects.
                 List<SkyObject> threateningObjects = strategy.analyze(currentSkyState);
-                System.out.println("RadarAnalyzerThread analyzed skyState");
+                logger.info("RadarAnalyzerThread analyzed skyState");
 
                 if (! threateningObjects.isEmpty()) {
                     AlarmEvent alarmEvent = new AlarmEvent(threateningObjects);
@@ -55,7 +59,6 @@ public class RadarAnalyzerThread extends Thread {
 
             }
         } catch (InterruptedException e) {
-            e.printStackTrace();
             throw new RuntimeException(e);
         }
     }

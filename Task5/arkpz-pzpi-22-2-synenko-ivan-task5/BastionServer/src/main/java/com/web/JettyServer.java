@@ -1,6 +1,8 @@
 package com.web;
 
 
+import com.thread.RadarViewerThread;
+import com.web.singleton.RadarViewerThreadSingleton;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.servlet.ServletContextHandler;
@@ -8,25 +10,32 @@ import org.eclipse.jetty.servlet.ServletHolder;
 
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.servlet.ServletContainer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.ExecutorService;
 
 public class JettyServer {
     private static final int PORT = 8080;
 
+    private Logger logger = LoggerFactory.getLogger(JettyServer.class);
+
     private Server server;
     private ExecutorService executorService;
 
-
-
-
-
-    public JettyServer(ExecutorService executorService) {
+    public JettyServer(ExecutorService executorService, RadarViewerThread viewerThread) {
 
         this.executorService = executorService;
-        server = new Server();
 
+        //Initialize SkyStateQueueSingleton - for accessing real-time view.
+        RadarViewerThreadSingleton.initialize(viewerThread);
 
+        initializeServer();
+
+    }
+
+    private void initializeServer() {
+        this.server = new Server();
 
         // Configure connector
         ServerConnector connector = new ServerConnector(server);
@@ -37,20 +46,19 @@ public class JettyServer {
         ServletContextHandler context = new ServletContextHandler(ServletContextHandler.SESSIONS);
         context.setContextPath("/");
 
-        // Configure Jersey servlet
+        // Configure Jersey servlets
         ResourceConfig resourceConfig = new JettyServerResourceConfig();
         ServletHolder jerseyServlet = new ServletHolder(new ServletContainer(resourceConfig));
         jerseyServlet.setInitOrder(0);
         context.addServlet(jerseyServlet, "/*");
 
         server.setHandler(context);
-
     }
 
 
 
     public void start() throws Exception {
-        System.out.println("Starting Jetty Server...");
+        logger.info("Starting Jetty Server...");
         server.start();
 
         executorService.submit(() -> {
@@ -63,7 +71,7 @@ public class JettyServer {
     }
 
     public void stop() throws Exception {
-        System.out.println("Stopping Jetty Server...");
+        logger.info("Stopping Jetty Server...");
         server.stop();
     }
 }

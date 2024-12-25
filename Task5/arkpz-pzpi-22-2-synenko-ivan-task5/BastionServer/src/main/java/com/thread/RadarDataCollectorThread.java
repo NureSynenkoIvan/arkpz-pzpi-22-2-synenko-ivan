@@ -1,14 +1,17 @@
 package com.thread;
 
 import com.web.resources.RadarReceiverResource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-public class RadarDataCollectorTread extends Thread {
+public class RadarDataCollectorThread extends Thread {
+    private static final Logger logger = LoggerFactory.getLogger(RadarDataCollectorThread.class);
 
-    public RadarDataCollectorTread() {
+    public RadarDataCollectorThread() {
     }
 
     public void start() {
-        System.out.println("Radar Data Collector started");
+        logger.info("Radar Data Collector started");
     }
 
     @Override
@@ -19,12 +22,12 @@ public class RadarDataCollectorTread extends Thread {
         try {
             if (RadarReceiverResource.listeningStarted()) {
                 RadarReceiverResource.tryPutToQueue();
-                System.out.println("RadarDataCollector put state to the queue, though not all radars have reported.");
+                logger.debug("Put state to the queue, though not all radars have reported.");
             } else {
-                System.out.println("RadarDataCollector: RadarReceiverResource listening not started");
+                logger.debug("RadarReceiverResource listening not started");
             }
         } catch (Exception e) {
-            System.err.println("Error during save operation: " + e.getMessage());
+            logger.error("Error during save operation", e);
         }
     }
 

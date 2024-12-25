@@ -21,12 +21,10 @@ import java.util.List;
 
 @Path("/devices")
 public class DeviceResource {
-    private DeviceDao deviceDao;
-
-    public DeviceResource() {
-        DatabaseService databaseService = DatabaseService.getInstance();
-        this.deviceDao = databaseService.getDeviceDao();
-    }
+    private final DeviceDao deviceDao =
+            DatabaseService
+                    .getInstance()
+                    .getDeviceDao();
 
     @GET
     @Path("/view")

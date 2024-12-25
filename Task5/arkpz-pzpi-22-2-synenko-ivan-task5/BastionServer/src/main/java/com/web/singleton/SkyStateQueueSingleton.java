@@ -1,26 +1,26 @@
-package com.web;
+package com.web.singleton;
 
 import com.model.SkyState;
 
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
-/// Singleton queue that's used to collect
-/// data from radars and send it to analyzer.
-/// One sky - one state at a given moment.
-public class SkyStateQueue {
+/// Singleton queue that's used to collect data
+/// from radars and send it to RadarAnalyzerThread.
+
+public class SkyStateQueueSingleton {
     private static final int SKY_STATE_QUEUE_SIZE = 10;
-    private static SkyStateQueue instance;
+    private static SkyStateQueueSingleton instance;
     BlockingQueue<SkyState> queue;
 
 
-    private SkyStateQueue() {
+    private SkyStateQueueSingleton() {
         queue = new ArrayBlockingQueue<>(SKY_STATE_QUEUE_SIZE);
     }
 
-    public static SkyStateQueue getInstance() {
+    public static SkyStateQueueSingleton getInstance() {
         if (instance == null) {
-            instance = new SkyStateQueue();
+            instance = new SkyStateQueueSingleton();
         }
         return instance;
     }

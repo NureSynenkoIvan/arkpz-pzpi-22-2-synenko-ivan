@@ -2,12 +2,15 @@ package com.thread;
 
 import com.BastionApplication;
 import com.events.AlarmEvent;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 
 public class AlarmThread extends Thread {
+
     private static final int TIME_UNTIL_AUTO_ALARM = 10000;
     private final BlockingQueue<AlarmEvent> alarmsQueue;
 
@@ -28,14 +31,16 @@ public class AlarmThread extends Thread {
                 //If alarm isn't already started - wait for manual input (Currently not realised).
                 if (! BastionApplication.isAlarm()) {
                     isSetManually.set(false);
+
+                    // Here is sout instead of logging - this represents out view.
                     System.out.println("Object considered dangerous! Alarm has been triggered!");
                     for (int i = 0; i < 10; i++) {
                         System.out.println("Waiting for alarm!");
-                        this.sleep(1000);
+                        this.sleep(TIME_UNTIL_AUTO_ALARM / 10);
                     }
 
                     //And start the alarm.
-                    System.out.println("Starting air alert! Notifying application!");
+                    System.out.println("Starting air alert!");
                     BastionApplication.startAlarm(event);
                 } else {
                     //This represents showing info about new threat.

@@ -17,7 +17,7 @@ public class BastionApplication {
     ExecutorService mainExecutor;
     ScheduledExecutorService scheduler;
 
-    RadarDataCollectorTread dataCollector;
+    RadarDataCollectorThread dataCollector;
     RadarAnalyzerThread analyzer;
     RadarViewerThread viewer;
     AlarmThread alarmer;
@@ -37,7 +37,7 @@ public class BastionApplication {
         alarmsQueue = new LinkedBlockingQueue<>();
         saveQueue = new LinkedBlockingQueue<>();
 
-        dataCollector = new RadarDataCollectorTread();
+        dataCollector = new RadarDataCollectorThread();
         analyzer = new RadarAnalyzerThread(viewsQueue, saveQueue, alarmsQueue);
         viewer = new RadarViewerThread(viewsQueue);
         alarmer = new AlarmThread(alarmsQueue);
@@ -46,7 +46,7 @@ public class BastionApplication {
         dailyCleaner = new DailyCleanupThread();
 
 
-        httpServer = new JettyServer(mainExecutor);
+        httpServer = new JettyServer(mainExecutor, viewer);
 
     }
 
@@ -76,6 +76,7 @@ public class BastionApplication {
 
     public static boolean stopAlarm() {
         System.out.println("STOPPING ALARM!!!");
+        NotificationService.getInstance().sendStopAlarmNotifications();
         return isAlarm.compareAndSet(true, false);
     }
 

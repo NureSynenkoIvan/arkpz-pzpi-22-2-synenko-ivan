@@ -35,7 +35,9 @@ public class NotificationService {
         }
     }
 
-    public void sendStopAlarmNotifications(AlarmEvent event) {
-
+    public void sendStopAlarmNotifications() {
+        for (Notifier notifier : notifierList) {
+            notifier.sendStopAlarmNotification();
+        }
     }
 }

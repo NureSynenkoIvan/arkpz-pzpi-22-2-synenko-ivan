@@ -1,6 +1,4 @@
-package com.model;
-
-import com.model.types.Coordinates;
+package org.example.model.server;
 
 import java.util.Objects;
 
@@ -17,14 +15,14 @@ public class SkyObject {
 
     }
 
-    public SkyObject(int deviceID,
+    public SkyObject(
                      Coordinates location,
                      double height,
                      double direction,
                      double heightVector,
                      double speed,
                      boolean hasTransponder) {
-        this.deviceID = deviceID;
+        this.deviceID = -1854719477;
         this.location = location;
         this.height = height;
         this.heightVector = heightVector;
@@ -52,22 +50,23 @@ public class SkyObject {
     @Override
     public String toString() {
         return "SkyObject{" +
-                "deviceID=" + deviceID + ",\n" +
-                "location=" + location + ",\n" +
-                "height=" + height + ",\n" +
-                "direction=" + direction + ",\n" +
-                "heightVector=" + heightVector + ",\n" +
-                "speed=" + speed + ",\n" +
-                "hasTransponder=" + hasTransponder + ",\n" +
+                "deviceID=" + deviceID +
+                ", location=" + location +
+                ", height=" + height +
+                ", direction=" + direction +
+                ", heightVector=" + heightVector +
+                ", speed=" + speed +
+                ", hasTransponder=" + hasTransponder +
                 '}';
     }
 
-    public void shiftToCoordinateSystem(Coordinates zeroPoint) {
-        double differenceX = zeroPoint.latitude - location.latitude;
-        double differenceY = zeroPoint.longitude - location.longitude;
-        this.location = new Coordinates(
-                location.latitude - differenceX,
-             location.longitude - differenceY
-        );
+    public String toJson() {
+        return "{\"deviceID\":" + deviceID + ", "
+                + "\"location\":" + location.toJson() + ", "
+                + "\"height\":" + height + ", "
+                + "\"direction\":" + direction + ", "
+                + "\"heightVector\":" + heightVector + ", "
+                + "\"speed\":" + speed + ", "
+                + "\"hasTransponder\":" + hasTransponder + "}";
     }
 }

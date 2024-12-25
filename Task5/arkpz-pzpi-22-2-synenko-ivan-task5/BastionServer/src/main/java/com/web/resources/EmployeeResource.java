@@ -21,12 +21,12 @@ import java.util.List;
 @Path("/employees")
 public class EmployeeResource {
 
-    private EmployeeDao employeeDao;
+    private EmployeeDao employeeDao
+            = DatabaseService
+            .getInstance()
+            .getEmployeeDao();
 
-    public EmployeeResource() {
-        DatabaseService databaseService = DatabaseService.getInstance();
-        this.employeeDao = databaseService.getEmployeeDao();
-    }
+
 
     @GET
     @Path("/view")

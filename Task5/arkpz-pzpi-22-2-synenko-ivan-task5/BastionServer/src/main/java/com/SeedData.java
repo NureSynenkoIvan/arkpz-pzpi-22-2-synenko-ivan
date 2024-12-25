@@ -82,19 +82,19 @@ public class SeedData {
 
     public static void main(String[] args) {
         try {
-            /*
+
             devices.forEach(device -> {
                 deviceDao.save(device);
                 System.out.println("Inserted into db: " + device.toString());
-            });*/
+            });
             employees.forEach(employee -> {
                 employeeDao.save(employee);
                 System.out.println("Inserted into db: " + employee.toString());
             });
-            /*messageScenarios.forEach(scenario -> {
+            messageScenarios.forEach(scenario -> {
                 messageScenarioDao.save(scenario);
                 System.out.println("Inserted into db: " + scenario.toString());
-            });*/
+            });
 
         } catch (MongoWriteException e) {
             System.out.println("You're trying to insert test information into DB, while it's already there. \n"
