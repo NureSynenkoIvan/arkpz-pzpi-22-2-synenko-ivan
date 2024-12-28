@@ -58,7 +58,7 @@ public class BastionApplication {
 
         scheduler.scheduleAtFixedRate(dataCollector, 10, 3, TimeUnit.SECONDS);
         scheduler.scheduleAtFixedRate(saver, 10, 10, TimeUnit.SECONDS);
-        scheduler.scheduleAtFixedRate(dailyCleaner, 0, 11, TimeUnit.DAYS);
+        scheduler.scheduleAtFixedRate(dailyCleaner, 0, 1, TimeUnit.DAYS);
 
         httpServer.start();
 
